@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-// ─── Configuración ──────────────────────────────────────────────────────────
+// ─── CONFIGURACIÓN ──────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = "chazz2025"; 
 const STORAGE_COMMS  = "chazz_comms_v4";
 const STORAGE_CATS   = "chazz_cats_v4";
@@ -42,7 +42,7 @@ export default function App() {
     if(newCats) { setCategorias(newCats); localStorage.setItem(STORAGE_CATS, JSON.stringify(newCats)); }
   };
 
-  // HEADER GLOBAL INSTITUCIONAL
+  // HEADER GLOBAL
   const HeaderGlobal = ({ titulo, color, showBack = true }) => (
     <div style={{...S.globalHeader, borderBottom: `4px solid ${color || C.red}`}}>
       <div style={S.headerLeft}>
@@ -51,24 +51,23 @@ export default function App() {
       </div>
       <div style={S.headerRight}>
         <span style={S.chazzText}>CHAZZ</span>
-        <img src="/burger.png" style={S.burgerIcon} alt="Mascota" onError={e=>e.target.style.opacity=0}/>
+        <img src="/burger.png" style={S.burgerIcon} alt="M" onError={e=>e.target.style.opacity=0}/>
       </div>
     </div>
   );
 
-  // 1. ADMIN PANEL
+  // VISTAS
   if (currentPath === "/admin") {
     if (!isAdmin) { navigate("/login"); return null; }
     return <AdminPanel comunicados={comunicados} categorias={categorias} onSave={saveData} onLogout={() => { setIsAdmin(false); sessionStorage.removeItem(SESSION_KEY); navigate("/"); }} />;
   }
 
-  // 2. LOGIN
   if (currentPath === "/login") {
     return (
       <div style={S.centerView}>
         <div style={S.loginBox}>
           <img src="/logo.png" style={{width:100, marginBottom:20}} alt="Logo" />
-          <input type="password" placeholder="Contraseña Admin" style={S.input} autoFocus onKeyDown={(e) => {
+          <input type="password" placeholder="Contraseña" style={S.input} autoFocus onKeyDown={(e) => {
             if (e.key === 'Enter' && e.target.value === ADMIN_PASSWORD) {
               setIsAdmin(true); sessionStorage.setItem(SESSION_KEY, "1"); navigate("/admin");
             }
@@ -79,11 +78,10 @@ export default function App() {
     );
   }
 
-  // 3. VER COMUNICADO
   if (currentPath.startsWith("/ver/")) {
     const id = currentPath.split("/ver/")[1];
     const item = comunicados.find(c => c.id === id);
-    if (!item) return <div style={S.centerView}>Aviso no encontrado. <button onClick={() => navigate("/")}>Volver</button></div>;
+    if (!item) return <div style={S.centerView}>No encontrado. <button onClick={() => navigate("/")}>Volver</button></div>;
     const cat = categorias.find(cat => cat.id === item.categoria) || categorias[0];
     return (
       <div style={S.view}>
@@ -102,7 +100,6 @@ export default function App() {
     );
   }
 
-  // 4. LISTA POR ÁREA
   const catActual = categorias.find(c => "/" + c.id === currentPath);
   if (catActual) {
     const filtrados = comunicados.filter(c => !c.archivado && (c.categoria === catActual.id || c.categoria === "todos")).sort((a,b)=>b.id - a.id);
@@ -120,13 +117,12 @@ export default function App() {
               <p style={{fontSize:13, color:"#666", marginTop:8}}>{c.cuerpo.slice(0,80)}...</p>
             </div>
           ))}
-          {filtrados.length === 0 && <p style={S.empty}>No hay avisos recientes.</p>}
+          {filtrados.length === 0 && <p style={S.empty}>No hay comunicados activos.</p>}
         </div>
       </div>
     );
   }
 
-  // 5. HOME
   return (
     <div style={S.view}>
       <div style={S.hero}>
@@ -151,7 +147,7 @@ export default function App() {
 
 // ─── COMPONENTE PANEL ADMIN ────────────────────────────────────────────────
 function AdminPanel({ comunicados, categorias, onLogout, onSave }) {
-  const [tab, setTab] = useState("lista"); // 'lista', 'nuevo', 'areas'
+  const [tab, setTab] = useState("lista");
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ titulo: "", cuerpo: "", categoria: "todos", autor: "Oscar" });
 
@@ -162,7 +158,7 @@ function AdminPanel({ comunicados, categorias, onLogout, onSave }) {
   };
 
   const handlePublicar = () => {
-    if(!form.titulo || !form.cuerpo) return alert("Completa los datos");
+    if(!form.titulo || !form.cuerpo) return alert("Llena los campos");
     if(editId) {
       const actualizados = comunicados.map(c => c.id === editId ? { ...c, ...form } : c);
       onSave(actualizados, null);
@@ -182,8 +178,8 @@ function AdminPanel({ comunicados, categorias, onLogout, onSave }) {
   const agregarArea = () => {
     const nombre = prompt("Nombre de la nueva área:");
     if(!nombre) return;
-    const emoji = prompt("Emoji para el área:", "📋");
-    const color = prompt("Color hexadecimal (ej: #FF5733):", "#D32F2F");
+    const emoji = prompt("Emoji:", "📋");
+    const color = prompt("Color hex:", "#D32F2F");
     const id = nombre.toLowerCase().replace(/\s+/g, '-');
     onSave(null, [...categorias, { id, label: nombre, emoji, color, colorLight: color + "22" }]);
   };
@@ -192,9 +188,8 @@ function AdminPanel({ comunicados, categorias, onLogout, onSave }) {
     <div style={S.view}>
       <div style={S.adminBar}>
         <strong>ADMIN CHAZZ</strong>
-        <button onClick={onLogout} style={S.btnLogout}>Salir</button>
+        <button onClick={onLogout} style={S.btnLogoutSmall}>Salir</button>
       </div>
-      
       <div style={S.tabBar}>
         <button onClick={() => { setTab("lista"); setEditId(null); }} style={tab==="lista"?S.tabA:S.tab}>Historial</button>
         <button onClick={() => setTab("nuevo")} style={tab==="nuevo"?S.tabA:S.tab}>{editId ? "✏️ Editar" : "+ Nuevo"}</button>
@@ -203,24 +198,19 @@ function AdminPanel({ comunicados, categorias, onLogout, onSave }) {
 
       {tab === "nuevo" ? (
         <div style={{padding:20}}>
-          <label style={S.adminLabel}>Título</label>
-          <input style={S.input} value={form.titulo} onChange={e=>setForm({...form, titulo: e.target.value})} />
-          <label style={S.adminLabel}>Área</label>
+          <input style={S.input} placeholder="Título" value={form.titulo} onChange={e=>setForm({...form, titulo: e.target.value})} />
           <select style={S.input} value={form.categoria} onChange={e=>setForm({...form, categoria: e.target.value})}>
             {categorias.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
           </select>
-          <label style={S.adminLabel}>Mensaje</label>
-          <textarea style={{...S.input, height:150}} value={form.cuerpo} onChange={e=>setForm({...form, cuerpo: e.target.value})} />
+          <textarea style={{...S.input, height:150}} placeholder="Mensaje..." value={form.cuerpo} onChange={e=>setForm({...form, cuerpo: e.target.value})} />
+          <input style={S.input} placeholder="Autor" value={form.autor} onChange={e=>setForm({...form, autor: e.target.value})} />
           <button onClick={handlePublicar} style={S.btnPub}>{editId ? "Guardar Cambios" : "Publicar Ahora"}</button>
         </div>
       ) : tab === "lista" ? (
         <div style={{padding:15}}>
           {comunicados.map(c => (
             <div key={c.id} style={{...S.adminRow, opacity: c.archivado ? 0.5 : 1}}>
-              <div style={{flex:1}}>
-                <strong>{c.titulo}</strong><br/>
-                <small>{c.categoria} - {c.fecha}</small>
-              </div>
+              <div style={{flex:1}}><strong>{c.titulo}</strong><br/><small>{c.categoria} - {c.fecha}</small></div>
               <div style={{display:"flex", gap:10}}>
                 <button onClick={() => iniciarEdicion(c)} style={S.btnIcon}>✏️</button>
                 <button onClick={() => onSave(comunicados.map(x => x.id === c.id ? {...x, archivado: !x.archivado} : x), null)} style={S.btnIcon}>
@@ -238,7 +228,7 @@ function AdminPanel({ comunicados, categorias, onLogout, onSave }) {
             {categorias.map(c => (
               <div key={c.id} style={S.adminRow}>
                 <span>{c.emoji} {c.label}</span>
-                {c.id !== "todos" && <button onClick={() => { if(window.confirm("¿Borrar área?")) onSave(null, categorias.filter(x => x.id !== c.id)) }} style={{color:"red", border:"none", background:"none"}}>Eliminar</button>}
+                {c.id !== "todos" && <button onClick={() => onSave(null, categorias.filter(x => x.id !== c.id))} style={{color:"red", border:"none", background:"none"}}>Eliminar</button>}
               </div>
             ))}
           </div>
@@ -248,7 +238,7 @@ function AdminPanel({ comunicados, categorias, onLogout, onSave }) {
   );
 }
 
-// ─── Estilos ────────────────────────────────────────────────────────────────
+// ─── ESTILOS ────────────────────────────────────────────────────────────────
 const S = {
   view: { minHeight:"100vh", background: "#f4f4f4", fontFamily: "Arial, sans-serif", maxWidth: 500, margin: "0 auto" },
   centerView: { minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f4f4f4" },
@@ -273,7 +263,6 @@ const S = {
   artAutor: { marginTop:25, fontSize:13, color:"#888", borderTop:"1px solid #eee", paddingTop:15 },
   loginBox: { background: "#fff", padding: 40, borderRadius: 25, textAlign: "center", boxShadow: "0 15px 35px rgba(0,0,0,0.1)", width: "85%" },
   input: { width: "100%", padding: 12, margin: "8px 0 15px", borderRadius: 10, border: "1px solid #ddd", fontSize: 16, boxSizing: "border-box", background: "#f9f9f9" },
-  adminLabel: { fontSize:12, fontWeight:"bold", color:"#666", display:"block", textAlign:"left", marginLeft:5 },
   btnPub: { width: "100%", padding: 16, background: "#D32F2F", color: "#fff", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 16 },
   btnAdmin: { background: "none", border: "1px solid #bbb", color: "#888", padding: "10px 20px", borderRadius: 25, fontSize: 12 },
   btnText: { background: "none", border: "none", color: "#999", cursor: "pointer", marginTop: 10 },
@@ -283,6 +272,6 @@ const S = {
   tabA: { flex: 1, padding: 15, border: "none", background: "none", borderBottom: "4px solid #D32F2F", color: "#D32F2F", fontWeight: "bold" },
   adminRow: { background: "#fff", padding: 15, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #eee", borderRadius: 8 },
   btnIcon: { background:"none", border:"none", fontSize:18, cursor:"pointer" },
-  btnLogout: { background:"none", border:"1px solid #fff", color:"#fff", borderRadius:4, padding:"2px 8px", fontSize:11 },
+  btnLogoutSmall: { background:"none", border:"1px solid #fff", color:"#fff", borderRadius:4, padding:"2px 8px", fontSize:11 },
   empty: { textAlign: "center", color: "#999", marginTop: 50 }
 };
