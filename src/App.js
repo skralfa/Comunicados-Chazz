@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-// ─── Configuración ──────────────────────────────────────────────────────────
+// ─── CONFIGURACIÓN ──────────────────────────────────────────────────────────
 const ADMIN_PASSWORD = "chazz2025"; 
 const STORAGE_COMMS  = "chazz_comms_v3";
 const STORAGE_CATS   = "chazz_cats_v3";
@@ -37,35 +37,31 @@ export default function App() {
   const navigate = (path) => { window.location.hash = path; };
   const currentPath = route.replace("#", "");
 
-  // ─── HEADER INSTITUCIONAL (LOGO + MASCOTA ARRIBA) ──────────────────────────
+  const saveData = (newComms, newCats) => {
+    if(newComms) { setComunicados(newComms); localStorage.setItem(STORAGE_COMMS, JSON.stringify(newComms)); }
+    if(newCats) { setCategorias(newCats); localStorage.setItem(STORAGE_CATS, JSON.stringify(newCats)); }
+  };
+
+  // HEADER GLOBAL
   const HeaderGlobal = ({ titulo, color, showBack = true }) => (
     <div style={{...S.globalHeader, borderBottom: `4px solid ${color || C.red}`}}>
       <div style={S.headerLeft}>
-        {showBack && isAdmin && <button onClick={() => window.history.back()} style={S.btnBack}>Menú</button>}
+        {showBack && isAdmin && <button onClick={() => navigate("/")} style={S.btnBack}>Menú</button>}
         <h2 style={{margin:0, color: color || C.red, fontSize: 22}}>{titulo}</h2>
       </div>
       <div style={S.headerRight}>
         <span style={S.chazzText}>CHAZZ</span>
-        <img src="/burger.png" style={S.burgerIcon} alt="Mascot" />
+        <img src="/burger.png" style={S.burgerIcon} alt="Mascota" onError={e=>e.target.style.opacity=0}/>
       </div>
     </div>
   );
 
-  // 1. VISTA ADMIN
+  // VISTAS
   if (currentPath === "/admin") {
     if (!isAdmin) { navigate("/login"); return null; }
-    return <AdminPanel 
-              comunicados={comunicados} 
-              categorias={categorias} 
-              onLogout={() => { setIsAdmin(false); sessionStorage.removeItem(SESSION_KEY); navigate("/"); }}
-              onSave={(newComms, newCats) => {
-                if(newComms) { setComunicados(newComms); localStorage.setItem(STORAGE_COMMS, JSON.stringify(newComms)); }
-                if(newCats) { setCategorias(newCats); localStorage.setItem(STORAGE_CATS, JSON.stringify(newCats)); }
-              }}
-            />;
+    return <AdminPanel comunicados={comunicados} categorias={categorias} onSave={saveData} onLogout={() => { setIsAdmin(false); sessionStorage.removeItem(SESSION_KEY); navigate("/"); }} />;
   }
 
-  // 2. VISTA LOGIN
   if (currentPath === "/login") {
     return (
       <div style={S.centerView}>
@@ -82,13 +78,11 @@ export default function App() {
     );
   }
 
-  // 3. VISTA VER COMUNICADO (Individual)
   if (currentPath.startsWith("/ver/")) {
     const id = currentPath.split("/ver/")[1];
     const item = comunicados.find(c => c.id === id);
     if (!item) return <div style={S.centerView}>No encontrado. <button onClick={() => navigate("/")}>Volver</button></div>;
     const cat = categorias.find(cat => cat.id === item.categoria) || categorias[0];
-
     return (
       <div style={S.view}>
         <HeaderGlobal titulo={cat.label} color={cat.color} />
@@ -100,16 +94,15 @@ export default function App() {
           <h1 style={S.artTitle}>{item.titulo}</h1>
           <div style={S.divider} />
           <div style={S.artBody}>{item.cuerpo}</div>
-          <p style={S.artAutor}>Publicado por: <strong>{item.autor || "Admin"}</strong></p>
+          <p style={S.artAutor}>Publicado por: <strong>{item.autor}</strong></p>
         </div>
       </div>
     );
   }
 
-  // 4. VISTA CATEGORÍA (Lista de mensajes)
   const catActual = categorias.find(c => "/" + c.id === currentPath);
   if (catActual) {
-    const filtrados = comunicados.filter(c => !c.archivado && (c.categoria === catActual.id || c.categoria === "todos")).sort((a,b)=>b.id - a.id);
+    const filtrados = comunicados.filter(c => !c.archivado && (c.categoria === catActual.id || c.categoria === "todos"));
     return (
       <div style={S.view}>
         <HeaderGlobal titulo={catActual.label} color={catActual.color} />
@@ -120,21 +113,20 @@ export default function App() {
                   <span style={{...S.badge, fontSize:10, background: catActual.colorLight, color: catActual.color}}>{c.categoria.toUpperCase()}</span>
                   <span style={{fontSize:11, color:"#999"}}>{c.fecha}</span>
                </div>
-              <h3 style={{margin:0, fontSize:18, fontWeight: "bold", color:"#333"}}>{c.titulo}</h3>
+              <h3 style={{margin:0, fontSize:18, fontWeight: "bold"}}>{c.titulo}</h3>
               <p style={{fontSize:13, color:"#666", marginTop:8}}>{c.cuerpo.slice(0,80)}...</p>
             </div>
           ))}
-          {filtrados.length === 0 && <p style={S.empty}>No hay comunicados en esta área.</p>}
+          {filtrados.length === 0 && <p style={S.empty}>No hay comunicados activos.</p>}
         </div>
       </div>
     );
   }
 
-  // 5. HOME (Pantalla con cuadritos)
   return (
     <div style={S.view}>
       <div style={S.hero}>
-        <img src="/logo.png" style={{width:130}} alt="Logo Principal" />
+        <img src="/logo.png" style={{width:130}} alt="Logo" />
         <h1 style={{color:C.red, margin:"15px 0 5px", fontSize:28, fontWeight:800}}>Comunicados</h1>
         <div style={S.line} />
       </div>
@@ -153,17 +145,39 @@ export default function App() {
   );
 }
 
-// ─── Panel Admin ────────────────────────────────────────────────────────────
+// ─── PANEL ADMIN (ACTUALIZADO) ──────────────────────────────────────────────
 function AdminPanel({ comunicados, categorias, onLogout, onSave }) {
-  const [tab, setTab] = useState("nuevo");
+  const [tab, setTab] = useState("lista");
+  const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ titulo: "", cuerpo: "", categoria: "todos", autor: "Oscar" });
 
-  const publicar = () => {
-    if(!form.titulo || !form.cuerpo) return alert("Completa los datos");
-    const nuevo = { ...form, id: Date.now().toString(), fecha: new Date().toLocaleDateString(), archivado: false };
-    onSave([nuevo, ...comunicados], null);
+  const resetForm = () => {
     setForm({ titulo: "", cuerpo: "", categoria: "todos", autor: "Oscar" });
+    setEditId(null);
     setTab("lista");
+  };
+
+  const handlePublicar = () => {
+    if(!form.titulo || !form.cuerpo) return alert("Llena los campos obligatorios");
+    
+    if(editId) {
+      // Editar existente
+      const actualizados = comunicados.map(c => c.id === editId ? { ...c, ...form } : c);
+      onSave(actualizados, null);
+      alert("Comunicado actualizado");
+    } else {
+      // Crear nuevo
+      const nuevo = { ...form, id: Date.now().toString(), fecha: new Date().toLocaleDateString(), archivado: false };
+      onSave([nuevo, ...comunicados], null);
+      alert("Comunicado publicado");
+    }
+    resetForm();
+  };
+
+  const iniciarEdicion = (c) => {
+    setForm({ titulo: c.titulo, cuerpo: c.cuerpo, categoria: c.categoria, autor: c.autor });
+    setEditId(c.id);
+    setTab("nuevo");
   };
 
   return (
@@ -172,26 +186,50 @@ function AdminPanel({ comunicados, categorias, onLogout, onSave }) {
         <strong>ADMIN CHAZZ</strong>
         <button onClick={onLogout} style={{background:"none", border:"1px solid #fff", color:"#fff", borderRadius:4, padding:"2px 8px", fontSize:11}}>Salir</button>
       </div>
+      
       <div style={S.tabBar}>
-        <button onClick={() => setTab("nuevo")} style={tab==="nuevo"?S.tabA:S.tab}>+ Redactar</button>
-        <button onClick={() => setTab("lista")} style={tab==="lista"?S.tabA:S.tab}>Historial</button>
+        <button onClick={() => { setTab("lista"); setEditId(null); }} style={tab==="lista"?S.tabA:S.tab}>Historial</button>
+        <button onClick={() => setTab("nuevo")} style={tab==="nuevo"?S.tabA:S.tab}>{editId ? "✏️ Editando" : "+ Redactar"}</button>
       </div>
+
       {tab === "nuevo" ? (
         <div style={{padding:20}}>
-          <input style={S.input} placeholder="Título" value={form.titulo} onChange={e=>setForm({...form, titulo: e.target.value})} />
+          <label style={S.adminLabel}>Título del Comunicado</label>
+          <input style={S.input} value={form.titulo} onChange={e=>setForm({...form, titulo: e.target.value})} placeholder="Ej: Nueva Receta de Salsa" />
+          
+          <label style={S.adminLabel}>Área de destino</label>
           <select style={S.input} value={form.categoria} onChange={e=>setForm({...form, categoria: e.target.value})}>
             {categorias.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
           </select>
-          <textarea style={{...S.input, height:150}} placeholder="Escribe el comunicado aquí..." value={form.cuerpo} onChange={e=>setForm({...form, cuerpo: e.target.value})} />
-          <input style={S.input} placeholder="Autor" value={form.autor} onChange={e=>setForm({...form, autor: e.target.value})} />
-          <button onClick={publicar} style={S.btnPub}>Publicar Ahora</button>
+          
+          <label style={S.adminLabel}>Mensaje</label>
+          <textarea style={{...S.input, height:150}} value={form.cuerpo} onChange={e=>setForm({...form, cuerpo: e.target.value})} placeholder="Escribe aquí los detalles..." />
+          
+          <label style={S.adminLabel}>Autor</label>
+          <input style={S.input} value={form.autor} onChange={e=>setForm({...form, autor: e.target.value})} />
+          
+          <button onClick={handlePublicar} style={S.btnPub}>{editId ? "Guardar Cambios" : "Publicar Ahora"}</button>
+          {editId && <button onClick={resetForm} style={{...S.btnText, width:"100%", marginTop:10}}>Cancelar Edición</button>}
         </div>
       ) : (
         <div style={{padding:15}}>
+          {comunicados.length === 0 && <p style={S.empty}>No hay comunicados registrados.</p>}
           {comunicados.map(c => (
-            <div key={c.id} style={S.adminRow}>
-              <div><strong>{c.titulo}</strong><br/><small>{c.categoria} - {c.fecha}</small></div>
-              <button onClick={() => onSave(comunicados.filter(x => x.id !== c.id))} style={{color:"red", border:"none", background:"none", fontSize:18}}>🗑</button>
+            <div key={c.id} style={{...S.adminRow, opacity: c.archivado ? 0.6 : 1}}>
+              <div style={{flex:1}}>
+                <div style={{display:"flex", alignItems:"center", gap:10}}>
+                  <strong style={{fontSize:15}}>{c.titulo}</strong>
+                  {c.archivado && <span style={{fontSize:10, background:"#eee", padding:"2px 5px", borderRadius:4}}>ARCHIVADO</span>}
+                </div>
+                <small style={{color:"#888"}}>{c.categoria.toUpperCase()} — {c.fecha}</small>
+              </div>
+              <div style={{display:"flex", gap:12}}>
+                <button onClick={() => iniciarEdicion(c)} title="Editar" style={S.btnAction}>✏️</button>
+                <button onClick={() => onSave(comunicados.map(x => x.id === c.id ? {...x, archivado: !x.archivado} : x), null)} title="Archivar" style={S.btnAction}>
+                  {c.archivado ? "📤" : "📦"}
+                </button>
+                <button onClick={() => { if(window.confirm("¿Borrar permanentemente?")) onSave(comunicados.filter(x => x.id !== c.id), null) }} title="Eliminar" style={{...S.btnAction, color:"red"}}>🗑</button>
+              </div>
             </div>
           ))}
         </div>
@@ -200,11 +238,11 @@ function AdminPanel({ comunicados, categorias, onLogout, onSave }) {
   );
 }
 
-// ─── Estilos ────────────────────────────────────────────────────────────────
+// ─── ESTILOS (S) ────────────────────────────────────────────────────────────
 const S = {
   view: { minHeight:"100vh", background: "#f4f4f4", fontFamily: "Arial, sans-serif", maxWidth: 500, margin: "0 auto" },
   centerView: { minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#f4f4f4" },
-  globalHeader: { background: "#fff", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative" },
+  globalHeader: { background: "#fff", padding: "10px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" },
   headerLeft: { display: "flex", alignItems: "center", gap: 10 },
   headerRight: { display: "flex", alignItems: "center", gap: 8 },
   chazzText: { fontSize: 28, fontWeight: 900, color: "#333", letterSpacing: "-1px" },
@@ -218,20 +256,22 @@ const S = {
   cardMsg: { background: "#fff", padding: 20, borderRadius: 12, marginBottom: 15, boxShadow: "0 2px 8px rgba(0,0,0,0.05)", cursor:"pointer" },
   badge: { padding: "3px 10px", borderRadius: 20, fontWeight: "bold", textTransform: "uppercase", fontSize: 11 },
   artContainer: { padding: 25, background: "#fff", margin: 15, borderRadius: 15, boxShadow: "0 4px 15px rgba(0,0,0,0.05)" },
-  artMeta: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 15 },
-  artTitle: { fontSize: 24, margin: 0, fontWeight: 800, color: "#222", lineHeight: 1.2 },
-  divider: { height: 2, background: "#eee", margin: "20px 0" },
-  artBody: { lineHeight: 1.7, fontSize: 16, color: "#444", whiteSpace: "pre-wrap" },
-  artAutor: { marginTop: 25, fontSize: 13, color: "#888", borderTop: "1px solid #eee", paddingTop: 15 },
+  artMeta: { display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:15 },
+  artTitle: { fontSize:24, margin:0, fontWeight:800, color:"#222" },
+  divider: { height:2, background:"#eee", margin:"20px 0" },
+  artBody: { lineHeight:1.7, fontSize:16, color:"#444", whiteSpace:"pre-wrap" },
+  artAutor: { marginTop:25, fontSize:13, color:"#888", borderTop:"1px solid #eee", paddingTop:15 },
   loginBox: { background: "#fff", padding: 40, borderRadius: 25, textAlign: "center", boxShadow: "0 15px 35px rgba(0,0,0,0.1)", width: "85%" },
-  input: { width: "100%", padding: 14, margin: "15px 0", borderRadius: 10, border: "1px solid #ddd", fontSize: 16, boxSizing: "border-box", background: "#f9f9f9" },
-  btnPub: { width: "100%", padding: 16, background: "#D32F2F", color: "#fff", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 16 },
-  btnAdmin: { background: "none", border: "1px solid #bbb", color: "#888", padding: "10px 20px", borderRadius: 25, fontSize: 12 },
-  btnText: { background: "none", border: "none", color: "#999", cursor: "pointer", marginTop: 10 },
+  input: { width: "100%", padding: 14, margin: "8px 0 15px", borderRadius: 10, border: "1px solid #ddd", fontSize: 16, boxSizing: "border-box", background: "#f9f9f9" },
+  adminLabel: { fontSize:12, fontWeight:"bold", color:"#666", display:"block", textAlign:"left", marginLeft:5 },
+  btnPub: { width: "100%", padding: 16, background: "#D32F2F", color: "#fff", border: "none", borderRadius: 10, fontWeight: "bold", fontSize: 16, cursor:"pointer" },
+  btnAdmin: { background: "none", border: "1px solid #bbb", color: "#888", padding: "10px 20px", borderRadius: 25, fontSize: 12, cursor:"pointer" },
+  btnText: { background: "none", border: "none", color: "#999", cursor: "pointer" },
   adminBar: { background: "#222", color: "#fff", padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" },
   tabBar: { display: "flex", background: "#fff", borderBottom: "1px solid #ddd" },
-  tab: { flex: 1, padding: 15, border: "none", background: "none", color: "#999", fontWeight: "bold" },
-  tabA: { flex: 1, padding: 15, border: "none", background: "none", borderBottom: "4px solid #D32F2F", color: "#D32F2F", fontWeight: "bold" },
+  tab: { flex: 1, padding: 15, border: "none", background: "none", color: "#999", fontWeight: "bold", cursor:"pointer" },
+  tabA: { flex: 1, padding: 15, border: "none", background: "none", borderBottom: "4px solid #D32F2F", color: "#D32F2F", fontWeight: "bold", cursor:"pointer" },
   adminRow: { background: "#fff", padding: 15, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid #eee", borderRadius: 8 },
+  btnAction: { background:"none", border:"none", fontSize:18, cursor:"pointer", padding:5 },
   empty: { textAlign: "center", color: "#999", marginTop: 50, fontStyle: "italic" }
 };
